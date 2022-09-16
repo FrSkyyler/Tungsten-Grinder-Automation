@@ -1,0 +1,46 @@
+What I need to do when I come back:
+1) Mount limit switches
+2) Test direction of motors
+3) Test servos and ensure they are in the currect position
+4) Test how many steps it takes to do a full rotation (either 200, 400, 800)
+5) Impliment a total length prompt
+	Prompt if user is wanting to sharpen a certain length
+	     if yes then prompt user for overall length
+		compute what the overall length you need to go back so the spindal can move with no interferance
+	     if no then use defualt length of 7in (this is a total of 5.5in) this should be close to the home position
+6) Figure out the correct number of steps to take to fully loosen and tighten the chuck (probably around 2 rotations)
+7) Create possible errors that could happen and display them on the screen so user can troubleshoot
+8) Comment code so if someone is reading it then it makes sense
+9) Create a total tutorial (what programs I used, the steps to upload code to the microcontroller, the different error codes that can appear,
+	what they mean, and how to troubleshoot them, the total process that the machine takes and what to look out for in the first couple cycles, 
+	what to do if the machine is having touble, how to turn the machine on and off using by the surge protector, terminal blocks, and on/off button) 
+
+What Conner and Trever can do before:
+1) Strengthen up mount for the hopper (talked about adding gussets, mounting legs to table, etc.)
+2)
+
+
+
+
+
+
+
+
+
+
+Things to do 9/16/2022:
+Done 1) Test out the different sizes array for the display and encoder
+Done 2) Play with counting down each time it runs
+Done 3) Solder limit switches for hopper, loading spindal, arm home, and carriage hard limit switch
+Done Kinda 4) Figure out servo mounting
+Done 5) Figure out how to wire DM320T's
+Done 6) Test moving a stepper and using a limit swtich (prefer using a stepper that is not connected to anything just in case)
+Done 7) Wire servos (aka extend the lengths)
+Done 8) Once sheet metal plate for mounting gets here, mount electronics in electrical box
+Done 9) Once sorting discs get here, mount and weld them on to SST rod
+Done (3D printed part) 10) Weld a piece of sheet metal to the stepper coupling to be able to figure out home postion
+Done 11) Build hopper with legs and mount to linear actuator
+12) Mount limit switches to correct spots and insure that they all are working properly and are secure
+13) Cable manage all of the wires (especially those that are coming from the arm rotating stepper and the chuck spinner)
+Done 14) Fully seat the bearing for the chuck, tighten the stepper motor, and attach the 3D printed gear to chuck
+Done 15) Mount surge protector into box and drill hole for plug to come out of

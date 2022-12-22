@@ -53,6 +53,8 @@ int32_t stepsPerRev = 800;              // The amount of steps it takes to do a 
 int32_t slideReloadingPosition = -(37.25 * stepsPerRev);  // NEED TO CHANGE The reloading position of the slider
 int32_t currSize;                       // The size that the user wants to run
 int32_t limitSwitchFlag = 0;
+int32_t sliderHardLimitPosition;
+int32_t sliderReloadPosition;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);             // Creates display object
 AccelStepper sliderStepper(AccelStepper::DRIVER, sliderStepperPul, sliderStepperDir); // Creates slider stepper object
@@ -263,32 +265,37 @@ void loop() {
   int i;
   for (i = 0; i < numOfTimes; i++) {
     hopperLoading(i); // Done Function to load the catch basin from the hopper (if i is 0 it will pass the step of rotating up to the hopper)
-    chuckLoadingAndUnloading(1, 1); // Change values to make sure it is spinning in the right direction
-    sharpenTungsten(); // Done
+    chuckLoadingAndUnloading(1, 1, i); // Change values to make sure it is spinning in the right direction
+    sharpenTungsten(i); // Done
     rotatingSpindelLoadAndUnload(0); //Done 
   }
   while (1);
 }
 
-void sharpenTungsten() {
+void sharpenTungsten(int quantity) {
   // Move arm to the down position
   armStepper.moveTo(-200);
   armStepper.runToPosition();
   
   // Move slider forward until it hits the sliderHardLimitSwitch and add in a timer so things dont break
   //elapsedMillis sliderHardTime;
-  limitSwitchFlag = 0;
-  while (limitSwitchFlag == 0 /*|| sliderHardTime <= 5000*/) { // CHANGE SLIDER HARD TIME VALUE
-    sliderStepper.move(-1);
-    sliderStepper.setSpeed((long)800);
-    sliderStepper.runSpeedToPosition();
-    delay(20);
-    if(digitalRead(sliderHardLimitSwitch) == LOW) {
-      limitSwitchFlag = 1;
+  if (quantity == 0) {
+    limitSwitchFlag = 0;
+    while (limitSwitchFlag == 0 /*|| sliderHardTime <= 5000*/) { // CHANGE SLIDER HARD TIME VALUE
+      sliderStepper.move(-1);
+      sliderStepper.setSpeed((long)800);
+      sliderStepper.runSpeedToPosition();
+      delay(20);
+      if(digitalRead(sliderHardLimitSwitch) == LOW) {
+        limitSwitchFlag = 1;
+      }
     }
+     limitSwitchFlag = 0;
+    sliderHardLimitPosition = sliderStepper.currentPosition();
+  } else {
+    sliderStepper.moveTo(sliderHardLimitPosition);
+    sliderStepper.runToPosition();
   }
-
-  limitSwitchFlag = 0;
   // Spin chuck clockwise for 50 rotations
   chuckStepper.moveTo(50 * 800);
   chuckStepper.runToPosition();
@@ -302,11 +309,17 @@ void sharpenTungsten() {
   armStepper.runToPosition();
 }
 
-void chuckLoadingAndUnloading(int directionToMove, int load) {
+void chuckLoadingAndUnloading(int directionToMove, int load, int quantity) {
   // Move arm forward for a certain amount of time or length (NEEDS TO BE CALCULATED)
   //sliderStepper.moveTo(slideReloadingPosition); //NEED to calculate the slideReloadingPosition
   //sliderStepper.runToPosition();
-  sliderStepper.runToNewPosition((long)slideReloadingPosition);
+  if (quantity == 0) {
+    sliderStepper.runToNewPosition((long)slideReloadingPosition);
+    sliderReloadPosition = sliderStepper.currentPosition();
+  } else {
+    sliderStepper.moveTo(sliderReloadPosition)'
+    sliderStepper.runToPosition();
+  }
 
   // Rotate chuck stepper to tighten/untighten chuck (direction)
   chuckStepper.moveTo(directionToMove * 1600);
@@ -322,8 +335,9 @@ void chuckLoadingAndUnloading(int directionToMove, int load) {
   sliderStepper.runToPosition();
   
   // If direction is equal to (-1 or 1 depending on what direction is what) rotate clamping servo so it releases tungsten
-    chuckStepper.moveTo(-directionToMove * 1600);
-    clampingServo.write(clampServoOpen);
+  chuckStepper.moveTo(-directionToMove * 1600);
+  chuckStepper.runToPosition();
+  clampingServo.write(clampServoOpen);
 
   // Move slider back
   sliderStepper.moveTo(sliderStepper.currentPosition() + (800*23)); // This is based on 800 steps to do a full rotation, might need to change

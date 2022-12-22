@@ -1,22 +1,22 @@
 // Program for automation of tungsten grinder machine project
 
-#include <AccelStepper.h> // Libary for Steppers
-#include <Adafruit_GFX.h> // Libary for Screen
-#include <Adafruit_SSD1306.h> // Libary for Screen
-#include <Wire.h> // Libary for I2C
-#include <Servo.h> // Libary for Servos
-#include "Adafruit_seesaw.h" // Libary for dial
-#include <seesaw_neopixel.h> // Libary for neopixel
-#include <SPI.h>
+#include <AccelStepper.h>     // Library for Steppers
+#include <Adafruit_GFX.h>     // Library for Screen
+#include <Adafruit_SSD1306.h> // Library for Screen
+#include <Wire.h>             // Library for I2C
+#include <Servo.h>            // Library for Servos
+#include "Adafruit_seesaw.h"  // Library for dial
+#include <seesaw_neopixel.h>  // Library for neopixel
+#include <SPI.h>              // Library for screen
 
 #define sliderStepperDir 9                // Pin for slider stepper direction
-#define sliderStepperPul 8               // Pin for slider stepper pulse
-#define armStepperDir    7              // Pin for arm stepper direction
-#define armStepperPul    6               // Pin for arm stepper pulse
-#define hopperStepperDir 5               // Pin for hopper stepper direction
-#define hopperStepperPul 4              // Pin for hopper stepper pulse
-#define chuckStepperDir  3               // Pin for chuck stepper direction
-#define chuckStepperPul  2               // Pin for chuck stepper pulse
+#define sliderStepperPul 8                // Pin for slider stepper pulse
+#define armStepperDir    7                // Pin for arm stepper direction
+#define armStepperPul    6                // Pin for arm stepper pulse
+#define hopperStepperDir 5                // Pin for hopper stepper direction
+#define hopperStepperPul 4                // Pin for hopper stepper pulse
+#define chuckStepperDir  3                // Pin for chuck stepper direction
+#define chuckStepperPul  2                // Pin for chuck stepper pulse
 
 #define rotatingArmServoPin  10           // Defines the pin for the rotating arm servo
 #define clampingServoPin     11           // Defines the pin for the clamping servo
@@ -38,70 +38,83 @@
 #define SS_NEOPIX        6
 
 
-#define stepperMinPulse 10
-#define stepperAcceleration 500
-#define stepperMaxSpeed 100
-#define stepperHomingSpeed 50
+int32_t stepperMinPulse = 10;
+int32_t stepperAcceleration = 500;
+int32_t homingStepperMaxSpeed = 100;
+int32_t stepperHomingSpeed = 100;
+int32_t stepperMaxSpeed = 500;
 
+int32_t numOfTimes = 0;                 // Number of times user wants machine to run 
+int32_t unloadingServoAngle = 165;      // This is the position where it meets up with the hopper
+int32_t loadingServoAngle = 20;         // This is the position where it meets up with the chuck
+int32_t clampServoOpen = 0;             // angle for when the clamp is open
+int32_t clampServoClosed = 90;          // angle for when the clamp is closed
+int32_t stepsPerRev = 800;              // The amount of steps it takes to do a full rotation
+int32_t slideReloadingPosition = -(37.25 * stepsPerRev);  // NEED TO CHANGE The reloading position of the slider
+int32_t currSize;                       // The size that the user wants to run
+int32_t limitSwitchFlag = 0;
 
-
-
-int32_t numOfTimes = 0; // Number of times user wants machine to run 
-int32_t slideHomePosition = 0;
-int32_t armHomePosition = 0;
-int32_t hopperHomePosition = 0;
-int32_t slideReloadingPosition = 1600; // NEED TO CHANGE
-int32_t unloadingServoAngle = 0;
-int32_t loadingServoAngle = 180; 
-int32_t clampServoOpen = 750; // pulse width for opening
-int32_t clampServoClosed = 1925; // pulse width for closing
-int32_t stepsPerRev = 800;
-int32_t currSize;
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET); // Creates display object
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);             // Creates display object
 AccelStepper sliderStepper(AccelStepper::DRIVER, sliderStepperPul, sliderStepperDir); // Creates slider stepper object
-AccelStepper armStepper(AccelStepper::DRIVER, armStepperPul, armStepperDir); // Creates arm stepper object
+AccelStepper armStepper(AccelStepper::DRIVER, armStepperPul, armStepperDir);          // Creates arm stepper object
 AccelStepper hopperStepper(AccelStepper::DRIVER, hopperStepperPul, hopperStepperDir); // Creates hopper stepper object
-AccelStepper chuckStepper(AccelStepper::DRIVER, chuckStepperPul, chuckStepperDir); // Creates chuck stepper object
-Adafruit_seesaw encoder;
-seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
+AccelStepper chuckStepper(AccelStepper::DRIVER, chuckStepperPul, chuckStepperDir);    // Creates chuck stepper object
+Adafruit_seesaw encoder;                                                              // Creates encoder object
+seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);        // Creates neopixel object
 
-int32_t encoder_position;
-// This is for the hopper system to figure out what angel to go for each size
-String sizes[4] = {"1/8", "3/32", "1/16", ".040"};
+int32_t encoder_position;                           // Encoder position
+String sizes[4] = {"1/8", "3/32", "1/16", ".040"};  // The different diameters of tungsten used for both display and hopper position
 
-int stepsForHopper[4] = {100, 200, 300, 400}; //This will need to be changed
-int32_t stepsToTakeForHopper;
+//int stepsForHopper[4] = {0, 66, 123, 171};          // Steps the hopper stepper need to take for each size {1/8", 3/32", 1/16", .040"}
+int stepsForHopper[4] = {171, 123, 66, 0};          // Steps the hopper stepper need to take for each size {1/8", 3/32", 1/16", .040"}
 
 Servo rotatingArmServo; // Creates rotating arm servo object
-Servo clampingServo; // Creates clamping arm servo object
+Servo clampingServo;    // Creates clamping arm servo object
 
 void setup() {
   Serial.begin(9600);
-  pinMode(homingSliderLimitSwitch, INPUT_PULLUP); // Sets the slider homing limit switch to an INPUT
-  pinMode(homingArmLimitSwitch, INPUT_PULLUP); // Sets the arm homing limit switch to an INPUT
-  pinMode(homingHopperLimitSwitch, INPUT_PULLUP); // Sets the hopper homing limit switch to an INPUT
-  pinMode(sliderHardLimitSwitch, INPUT_PULLUP); // Sets the slider hard stop limit switch to an INPUT
-  pinMode(rotatingArmLoadedLimitSwitch, INPUT_PULLUP); // Sets the rotating arm loaded limit switch to an INPUT
-  pinMode(rotatingArmUnloadedLimitSwitch, INPUT_PULLUP); // Sets the rotating arm unloaded limit switch to an INPUT
+  pinMode(homingSliderLimitSwitch, INPUT_PULLUP);         // Sets the slider homing limit switch to an INPUT
+  pinMode(homingArmLimitSwitch, INPUT_PULLUP);            // Sets the arm homing limit switch to an INPUT
+  pinMode(homingHopperLimitSwitch, INPUT_PULLUP);         // Sets the hopper homing limit switch to an INPUT
+  pinMode(sliderHardLimitSwitch, INPUT_PULLUP);           // Sets the slider hard stop limit switch to an INPUT
+  pinMode(rotatingArmLoadedLimitSwitch, INPUT_PULLUP);    // Sets the rotating arm loaded limit switch to an INPUT
+  pinMode(rotatingArmUnloadedLimitSwitch, INPUT_PULLUP);  // Sets the rotating arm unloaded limit switch to an INPUT
   
   rotatingArmServo.attach(rotatingArmServoPin); // Initializes rotating arm servo to the correct pin
-  clampingServo.attach(clampingServoPin); // Initializes clamping servo to the correct pin
+  clampingServo.attach(clampingServoPin);       // Initializes clamping servo to the correct pin
   
-  sliderStepper.setMinPulseWidth(stepperMinPulse);
-  sliderStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the slider stepper motor (NEED TO FIND BEST VALUE)
+  sliderStepper.setMinPulseWidth(stepperMinPulse);    // Sets the pulse width of the slider stepper motor, this is needed because the Teensy is too fast
+  sliderStepper.setMaxSpeed(1200);   // Sets max speed of the slider stepper motor (NEED TO FIND BEST VALUE)
   sliderStepper.setAcceleration(stepperAcceleration); // Sets max acceleration of the slider stepper motor (NEED TO FIND BEST VALUE)
-  armStepper.setMinPulseWidth(stepperMinPulse);
-  armStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the arm stepper motor (NEED TO FIND BEST VALUE)
-  armStepper.setAcceleration(stepperAcceleration); // Sets max acceleration of the arm stepper motor (NEED TO FIND BEST VALUE)
-  hopperStepper.setMinPulseWidth(stepperMinPulse);
-  hopperStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the hopper stepper motor (NEED TO FIND BEST VALUE)
+  armStepper.setMinPulseWidth(stepperMinPulse);       // Sets the pulse width of the arm stepper motor, this is needed because the Teensy is too fast
+  armStepper.setMaxSpeed(homingStepperMaxSpeed);      // Sets max speed of the arm stepper motor (NEED TO FIND BEST VALUE)
+  armStepper.setAcceleration(stepperAcceleration);    // Sets max acceleration of the arm stepper motor (NEED TO FIND BEST VALUE)
+  hopperStepper.setMinPulseWidth(stepperMinPulse);    // Sets the pulse width of the hopper stepper motor, this is needed because the Teensy is too fast
+  hopperStepper.setMaxSpeed(homingStepperMaxSpeed);   // Sets max speed of the hopper stepper motor (NEED TO FIND BEST VALUE)
   hopperStepper.setAcceleration(stepperAcceleration); // Sets max acceleration of the hopper stepper motor (NEED TO FIND BEST VALUE)
-  chuckStepper.setMinPulseWidth(stepperMinPulse);
-  chuckStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the chuck stepper motor (NEED TO FIND BEST VALUE)
-  chuckStepper.setAcceleration(stepperAcceleration); // Sets max acceleration of the chuck stepper motor (NEED TO FIND BEST VALUE)
+  chuckStepper.setMinPulseWidth(stepperMinPulse);     // Sets the pulse width of the chuck stepper motor, this is needed because the Teensy is too fast
+  chuckStepper.setMaxSpeed(homingStepperMaxSpeed);    // Sets max speed of the chuck stepper motor (NEED TO FIND BEST VALUE)
+  chuckStepper.setAcceleration(stepperAcceleration);  // Sets max acceleration of the chuck stepper motor (NEED TO FIND BEST VALUE)
 
-   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+  // Move hopper CCW (CHECK) unit it hits homing limit switch
+  //elapsedMillis hopperTime;
+  limitSwitchFlag = 0;
+  while (limitSwitchFlag == 0 /*|| hopperTime <= 3000*/) { // CHANGE HOPPER TIME VALUE
+    hopperStepper.move(-1);
+    hopperStepper.setSpeed(stepperHomingSpeed);
+    hopperStepper.runSpeedToPosition();
+    delay(20);
+    if(digitalRead(homingHopperLimitSwitch) == LOW) {
+      limitSwitchFlag = 1;
+    }
+  }
+  
+  delay(5000);
+  // Position of hopper will be on the 1/8" slot and will be on position 0
+  hopperStepper.setCurrentPosition(0);
+  limitSwitchFlag = 0; // Set the limit switch flag back to 0 for future homings
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
@@ -198,142 +211,145 @@ void setup() {
   } else {
     currSize = encoder_position % 4;
   }
-  
-  
-  
-  //   Wait until user scrolle to desired quantity and pushed in the knob to confirm their choice
-  //   Store in variable
+
+  // Move hopper to the currect size, currSize = 0 move 0 steps, currSize = 1 move 29.75 degrees 66 steps, currSize = 2 move 55.45 degrees 123 steps, currSize = 3 move 77.23 degrees 171-172 steps 
+  hopperStepper.moveTo(400 + stepsForHopper[currSize]);
+  hopperStepper.runToPosition();
+  delay(500);
+  // Note: don't want to set the hopper stepper to 0 becuase we can just tell the stepper to move 800-stepsForHopper[currSize]
+
   // Move slide back until it hits homing limit switch
-  elapsedMillis slideTime; 
-  while (digitalRead(homingSliderLimitSwitch) || slideTime <= 5000) { // CHANGE SLIDE TIME VALUE
+  //elapsedMillis slideTime; 
+  while (limitSwitchFlag == 0 /*|| slideTime <= 5000*/) { // CHANGE SLIDE TIME VALUE
     sliderStepper.move(1);
-    sliderStepper.setSpeed(stepperHomingSpeed);
+    sliderStepper.setSpeed((float)800);
     sliderStepper.runSpeedToPosition();
+    delay(13);
+    if (digitalRead(homingSliderLimitSwitch) == LOW) {
+      limitSwitchFlag = 1;
+    }
   }
   delay(500);
   // Test to see if this actually sets the current position to 0
   sliderStepper.setCurrentPosition(0);
+  limitSwitchFlag = 0;
   //slideHomePosition = sliderStepper.currentPosition();
   // Move arm CCW until it hits homing limit switch
-  elapsedMillis armTime;
-  while (digitalRead(homingArmLimitSwitch) || armTime <= 2000) { // CHANGE ARM TIME VALUE
+  //elapsedMillis armTime;
+  while (limitSwitchFlag == 0 /*|| armTime <= 2000*/) { // CHANGE ARM TIME VALUE
     armStepper.move(1);
     armStepper.setSpeed(stepperHomingSpeed);
     armStepper.runSpeedToPosition();
+    delay(20);
+    if(digitalRead(homingArmLimitSwitch) == LOW) {
+      limitSwitchFlag = 1;
+    }
   }
   delay(500);
   armStepper.setCurrentPosition(0);
-  //armHomePosition = armStepper.currentPosition();
-  // Move hopper CCW (CHECK) unit it hits homing limit switch
-  elapsedMillis hopperTime;
-  while (digitalRead(homingHopperLimitSwitch) || hopperTime <= 1000) { // CHANGE HOPPER TIME VALUE
-    hopperStepper.move(1);
-    hopperStepper.setSpeed(stepperHomingSpeed);
-    hopperStepper.runSpeedToPosition();
-  }
-  delay(500);
-  hopperStepper.setCurrentPosition(0);
+  limitSwitchFlag = 0;
 
-  hopperStepper.moveTo(stepsForHopper[currSize]); //This will need to be changed if it is supposed to be pos or neg
-  hopperStepper.runToPosition();
+  clampingServo.write(clampServoOpen);
   
   // Move rotating arm until it hits unloaded limit switch
-  rotatingArmServo.write(loadingServoAngle); // CHANGE THE VALUE
-//  elapsedMillis rotatingArmTime;
-//  while (digitalRead(rotatingArmUnloadedLimitSwitch) == HIGH || rotatingArmTime <= 2000) {
-//    int i = 91;
-//    rotatingArmServo.write(i);
-//    i++;
-//  }
-  clampingServo.write(clampServoOpen);
+  rotatingArmServo.write(unloadingServoAngle); 
 }
 
 void loop() {
+  sliderStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the slider stepper motor (NEED TO FIND BEST VALUE)
+  armStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the arm stepper motor (NEED TO FIND BEST VALUE)
+  hopperStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the hopper stepper motor (NEED TO FIND BEST VALUE)
+  chuckStepper.setMaxSpeed(stepperMaxSpeed); // Sets max speed of the chuck stepper motor (NEED TO FIND BEST VALUE)
   int i;
-  // Move hopper stepper up (NOTE: This will be a different value than normal operation) to desired slot
-  chuckLoadingAndUnloading(1); // Change values to make sure it is spinning in the right direction
-  rotatingArmLoadAndUnload(1); // 1 means that it is loaded
-  chuckLoadingAndUnloading(-1); // Change values to make sure it is spinning in the right direction
-  rotatingArmLoadAndUnload(-1); // -1 means that it is unloaded and is going to go back to the hopper
-  sharpenTungsten();
-  //int numTimes = numOfTimes;
-  for (i = 0; i < numOfTimes - 1; i++) {
-    hopperLoading();
-    chuckLoadingAndUnloading(1); // Change values to make sure it is spinning in the right direction
-    rotatingArmLoadAndUnload(1); // 1 means that it is loaded
-    chuckLoadingAndUnloading(-1); // Change values to make sure it is spinning in the right direction
-    rotatingArmLoadAndUnload(-1); // -1 means that it is unloaded and is going to go back to the hopper
-    sharpenTungsten();
+  for (i = 0; i < numOfTimes; i++) {
+    hopperLoading(i); // Done Function to load the catch basin from the hopper (if i is 0 it will pass the step of rotating up to the hopper)
+    chuckLoadingAndUnloading(1, 1); // Change values to make sure it is spinning in the right direction
+    sharpenTungsten(); // Done
+    rotatingSpindelLoadAndUnload(0); //Done 
   }
   while (1);
 }
 
 void sharpenTungsten() {
   // Move arm to the down position
-  armStepper.moveTo(200); // CHANGE VALUE (COULD BE NEGATIVE)
+  armStepper.moveTo(-200);
   armStepper.runToPosition();
   
   // Move slider forward until it hits the sliderHardLimitSwitch and add in a timer so things dont break
-  elapsedMillis sliderHardTime;
-  while (digitalRead(sliderHardLimitSwitch) || sliderHardTime <= 5000) { // CHANGE SLIDER HARD TIME VALUE
-    sliderStepper.move(1);
-    sliderStepper.setSpeed(stepperHomingSpeed);
+  //elapsedMillis sliderHardTime;
+  limitSwitchFlag = 0;
+  while (limitSwitchFlag == 0 /*|| sliderHardTime <= 5000*/) { // CHANGE SLIDER HARD TIME VALUE
+    sliderStepper.move(-1);
+    sliderStepper.setSpeed((long)800);
     sliderStepper.runSpeedToPosition();
+    delay(20);
+    if(digitalRead(sliderHardLimitSwitch) == LOW) {
+      limitSwitchFlag = 1;
+    }
   }
-  // Spin chuck clockwise for 10 seconds (Steps per rev * ~500 rpm / 60 * 10) = (Steps per rev * 83)
-  chuckStepper.moveTo(83 * stepsPerRev);
+
+  limitSwitchFlag = 0;
+  // Spin chuck clockwise for 50 rotations
+  chuckStepper.moveTo(50 * 800);
   chuckStepper.runToPosition();
   
-  // Move slider back 
-  sliderStepper.moveTo(slideHomePosition);
+  // Move slider back 23 rotations (this is about 4.5in)
+  sliderStepper.moveTo(sliderStepper.currentPosition() + (23 * 800));
   sliderStepper.runToPosition();
   
   // Rotate arm 90 degrees back up
-  armStepper.moveTo(armHomePosition);
+  armStepper.moveTo(0);
   armStepper.runToPosition();
 }
 
-void chuckLoadingAndUnloading(int directionToMove) {
+void chuckLoadingAndUnloading(int directionToMove, int load) {
   // Move arm forward for a certain amount of time or length (NEEDS TO BE CALCULATED)
-  sliderStepper.moveTo(slideReloadingPosition);
-  sliderStepper.runToPosition();
+  //sliderStepper.moveTo(slideReloadingPosition); //NEED to calculate the slideReloadingPosition
+  //sliderStepper.runToPosition();
+  sliderStepper.runToNewPosition((long)slideReloadingPosition);
 
   // Rotate chuck stepper to tighten/untighten chuck (direction)
-  chuckStepper.moveTo(directionToMove * 600);
+  chuckStepper.moveTo(directionToMove * 1600);
   chuckStepper.runToPosition();
+
+  sliderStepper.moveTo(0);
+  sliderStepper.runToPosition();
+
+  // Rotate the 
+  rotatingSpindelLoadAndUnload(load);
+
+  sliderStepper.moveTo(slideReloadingPosition);
+  sliderStepper.runToPosition();
+  
   // If direction is equal to (-1 or 1 depending on what direction is what) rotate clamping servo so it releases tungsten
-  if (directionToMove == 1) {
+    chuckStepper.moveTo(-directionToMove * 1600);
     clampingServo.write(clampServoOpen);
-  }
+
   // Move slider back
-  sliderStepper.moveTo(sliderStepper.currentPosition() - 18400); // This is based on 800 steps to do a full rotation, might need to change
+  sliderStepper.moveTo(sliderStepper.currentPosition() + (800*23)); // This is based on 800 steps to do a full rotation, might need to change
   sliderStepper.runToPosition();
 }
 
-void rotatingArmLoadAndUnload(int loadOrUnload) {
-  if (loadOrUnload) {
-    // Move clamping servo to just over the straight up and down position (clamping tungsten)
-    clampingServo.write(clampServoClosed);
-    // Rotate rotating arm servo until it hits the rotatingArmLoadedLimitSwitch
-//    rotatingArmServo.write(90); // Change the value
-//    while (digitalRead(rotatingArmLoadedLimitSwitch)) {
-//      int i = 89;
-//      rotatingArmServo.write(i);
-//      i--;
-//    }
-  rotatingArmServo.write(loadingServoAngle);
+void rotatingSpindelLoadAndUnload(int load) {
+  if (load) {
+    // Move rotating servo to the load position
+    rotatingArmServo.write(loadingServoAngle);
   } else {
     // Rotate rotating arm servo until it hits the rotatingArmUnloadedLimitSwitch
     rotatingArmServo.write(unloadingServoAngle);
   }
 }
 
-void hopperLoading() {
+void hopperLoading(int currentReloads) {
   // Move hopper stepper so that the desired size slot is pointing towards the top (Should be 180 degrees up)
-  hopperStepper.moveTo(hopperStepper.currentPosition() - 400); //NEEDS A VALUE (MAY NEED TO CHANGE VALUE OR SIGN)
-  hopperStepper.runToPosition();
+  if (currentReloads != 0) {
+    hopperStepper.moveTo(hopperStepper.currentPosition() + 400);
+    hopperStepper.runToPosition();
+  }
 
   // Move hopper stepper 180 degrees so that the tungsten will fall into the catch basin
-  hopperStepper.moveTo(hopperStepper.currentPosition() + 400); //NEEDS A VALUE (MAY NEED TO CHANGE VALUE OR SIGN)
+  hopperStepper.moveTo(hopperStepper.currentPosition() - 400); 
   hopperStepper.runToPosition();
+  // Move clamping servo to just over the straight up and down position (clamping tungsten)
+  clampingServo.write(clampServoClosed);
 }
